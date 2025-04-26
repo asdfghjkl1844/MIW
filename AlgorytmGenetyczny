@@ -1,0 +1,139 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace AlgorytmGenetyczny
+{
+    class Program
+    {
+        const int POPULACJA = 21;
+        const int ITERACJE = 100;
+        const int LBNP = 8;
+        const int PARAMETRY = 2;
+        const int DLUGOSC_CHROMOSOMU = LBNP * PARAMETRY;
+        static Random los = new Random();
+
+        static void Main()
+        {
+            bool[][] osobniki = new bool[POPULACJA][];
+            for (int i = 0; i < POPULACJA; i++)
+            {
+                osobniki[i] = LosujChromosom();
+            }
+
+            double[] wyniki = new double[POPULACJA];
+            for (int i = 0; i < POPULACJA; i++)
+            {
+                (double x1, double x2) = Dekoduj(osobniki[i]);
+                wyniki[i] = Funkcja(x1, x2);
+            }
+
+            Console.WriteLine("Przed pierwszą iteracją:");
+            for (int i = 0; i < POPULACJA; i++)
+            {
+                (double x1, double x2) = Dekoduj(osobniki[i]);
+                double przystosowanie = Funkcja(x1, x2);
+                Console.WriteLine($"Osobnik {i + 1}: x1 = {x1:F4}, x2 = {x2:F4}, przystosowanie = {przystosowanie:F4}");
+            }
+
+            for (int iteracja = 0; iteracja <= ITERACJE; iteracja++)
+            {
+                bool[][] nowaPopulacja = new bool[POPULACJA][];
+                double[] noweWyniki = new double[POPULACJA];
+
+                for (int i = 0; i < POPULACJA; i++)
+                {
+                    int zwyciezca = Turniej(wyniki);
+                    nowaPopulacja[i] = (bool[])osobniki[zwyciezca].Clone();
+
+                    int indexMutacji = los.Next(DLUGOSC_CHROMOSOMU);
+                    nowaPopulacja[i][indexMutacji] = !nowaPopulacja[i][indexMutacji];
+                }
+
+                int najlepszyIndex = NajlepszyIndex(wyniki);
+                nowaPopulacja[POPULACJA - 1] = (bool[])osobniki[najlepszyIndex].Clone();
+
+                for (int i = 0; i < POPULACJA; i++)
+                {
+                    (double x1, double x2) = Dekoduj(nowaPopulacja[i]);
+                    noweWyniki[i] = Funkcja(x1, x2);
+                }
+
+                double najlepszyWynik = noweWyniki.Max();
+                double sredniaWynikow = noweWyniki.Average();
+                Console.WriteLine($"Iteracja {iteracja}: Najlepszy = {najlepszyWynik:F4}, Srednia = {sredniaWynikow:F4}");
+
+                osobniki = nowaPopulacja;
+                wyniki = noweWyniki;
+            }
+        }
+
+        static bool[] LosujChromosom()
+        {
+            bool[] chromosom = new bool[DLUGOSC_CHROMOSOMU];
+            for (int i = 0; i < DLUGOSC_CHROMOSOMU; i++)
+            {
+                double liczba = los.NextDouble();
+                if (liczba < 0.5)
+                {
+                    chromosom[i] = true;
+                }
+                else
+                {
+                    chromosom[i] = false;
+                }
+            }
+            return chromosom;
+        }
+
+        static (double, double) Dekoduj(bool[] chromosom)
+        {
+            int x1_bity = 0;
+            int x2_bity = 0;
+
+            for (int i = 0; i < LBNP; i++)
+            {
+                if (chromosom[i])
+                    x1_bity |= (1 << (LBNP - 1 - i));
+            }
+
+            for (int i = 0; i < LBNP; i++)
+            {
+                if (chromosom[LBNP + i])
+                    x2_bity |= (1 << (LBNP - 1 - i));
+            }
+
+            double x1 = x1_bity / (Math.Pow(2, LBNP) / 100.0);
+            double x2 = x2_bity / (Math.Pow(2, LBNP) / 100.0);
+            return (x1, x2);
+        }
+
+        static double Funkcja(double x1, double x2)
+        {
+            return Math.Sin(0.05 * x1) + Math.Sin(0.05 * x2) + 0.4 * Math.Sin(0.15 * x1) * Math.Sin(0.15 * x2);
+        }
+
+        static int NajlepszyIndex(double[] wyniki)
+        {
+            double max = double.MinValue;
+            int index = 0;
+            for (int i = 0; i < wyniki.Length; i++)
+            {
+                if (wyniki[i] > max)
+                {
+                    max = wyniki[i];
+                    index = i;
+                }
+            }
+            return index;
+        }
+
+        static int Turniej(double[] wyniki)
+        {
+            int w1 = los.Next(wyniki.Length);
+            int w2 = los.Next(wyniki.Length);
+
+            return wyniki[w1] > wyniki[w2] ? w1 : w2;
+        }
+    }
+}
