@@ -1,0 +1,146 @@
+using System;
+
+class Neuron
+{
+    public double[] Wagi;
+    public double Wyjscie;
+    public double Delta;
+
+    private static Random rand = new Random();
+    private double beta = 1.0;
+
+    public Neuron(int liczbaWejsc)
+    {
+        Wagi = new double[liczbaWejsc + 1];
+        for (int i = 0; i < Wagi.Length; i++)
+            Wagi[i] = rand.NextDouble() * 2 - 1;
+    }
+
+    public double Aktywuj(double[] Wejscia)
+    {
+        double suma = Wagi[Wagi.Length - 1]; 
+        for (int i = 0; i < Wejscia.Length; i++)
+            suma += Wagi[i] * Wejscia[i];
+
+        Wyjscie = Sigmoida(suma);
+        return Wyjscie;
+    }
+
+    private double Sigmoida(double x)
+    {
+        return 1.0 / (1.0 + Math.Exp(-beta * x));
+    }
+
+    public double PochodnaSigmoidy()
+    {
+        return Wyjscie * (1 - Wyjscie);
+    }
+}
+
+class Warstwa
+{
+    public Neuron[] Neurony;
+
+    public Warstwa(int liczbaNeuronow, int liczbaWejsc)
+    {
+        Neurony = new Neuron[liczbaNeuronow];
+        for (int i = 0; i < liczbaNeuronow; i++)
+            Neurony[i] = new Neuron(liczbaWejsc);
+    }
+
+    public double[] PropagacjaWPrzod(double[] Wejscia)
+    {
+        double[] Wyjscia = new double[Neurony.Length];
+        for (int i = 0; i < Neurony.Length; i++)
+            Wyjscia[i] = Neurony[i].Aktywuj(Wejscia);
+        return Wyjscia;
+    }
+}
+
+class SiecNeuronowa
+{
+    private Warstwa WarstwaUkryta;
+    private Warstwa WarstwaWyjsciowa;
+    private double WspolczynnikUczenia = 0.3;
+    private int Epoki = 50000;
+
+    public SiecNeuronowa()
+    {
+        WarstwaUkryta = new Warstwa(2, 2);
+        WarstwaWyjsciowa = new Warstwa(1, 2);
+    }
+
+    public double[] PropagacjaWPrzod(double[] Wejscia)
+    {
+        var WyjsciaUkryte = WarstwaUkryta.PropagacjaWPrzod(Wejscia);
+        return WarstwaWyjsciowa.PropagacjaWPrzod(WyjsciaUkryte);
+    }
+
+    public void PropagacjaWTyl(double[][] DaneWejsciowe, double[][] OczekiwaneWyniki)
+    {
+        for (int epoka = 0; epoka < Epoki; epoka++)
+        {
+            double BladCalkowity = 0;
+            for (int i = 0; i < DaneWejsciowe.Length; i++)
+            {
+                var WyjsciaUkryte = WarstwaUkryta.PropagacjaWPrzod(DaneWejsciowe[i]);
+                var WynikiKoncowe = WarstwaWyjsciowa.PropagacjaWPrzod(WyjsciaUkryte);
+
+                double Blad = OczekiwaneWyniki[i][0] - WynikiKoncowe[0];
+                BladCalkowity += Math.Abs(Blad);
+
+                WarstwaWyjsciowa.Neurony[0].Delta = Blad * WarstwaWyjsciowa.Neurony[0].PochodnaSigmoidy();
+
+                for (int j = 0; j < WarstwaUkryta.Neurony.Length; j++)
+                {
+                    double waga = WarstwaWyjsciowa.Neurony[0].Wagi[j];
+                    WarstwaUkryta.Neurony[j].Delta = WarstwaWyjsciowa.Neurony[0].Delta * waga * WarstwaUkryta.Neurony[j].PochodnaSigmoidy();
+                }
+
+                AktualizujWagi(WarstwaWyjsciowa, WyjsciaUkryte);
+                AktualizujWagi(WarstwaUkryta, DaneWejsciowe[i]);
+            }
+
+            if (epoka % 1000 == 0)
+                Console.WriteLine($"Epoka {epoka}, Blad: {BladCalkowity}");
+        }
+    }
+
+    private void AktualizujWagi(Warstwa warstwa, double[] Wejscia)
+    {
+        foreach (var neuron in warstwa.Neurony)
+        {
+            for (int i = 0; i < Wejscia.Length; i++)
+                neuron.Wagi[i] += WspolczynnikUczenia * neuron.Delta * Wejscia[i];
+            neuron.Wagi[Wejscia.Length] += WspolczynnikUczenia * neuron.Delta; 
+        }
+    }
+
+    static void Main()
+    {
+        SiecNeuronowa siec = new SiecNeuronowa();
+
+        double[][] DaneWejsciowe = {
+            new double[] { 0, 0 },
+            new double[] { 0, 1 },
+            new double[] { 1, 0 },
+            new double[] { 1, 1 }
+        };
+
+        double[][] DaneWyjsciowe = {
+            new double[] { 0 },
+            new double[] { 1 },
+            new double[] { 1 },
+            new double[] { 0 }
+        };
+
+        siec.PropagacjaWTyl(DaneWejsciowe, DaneWyjsciowe);
+
+        Console.WriteLine("\nWyniki:");
+        foreach (var wejscie in DaneWejsciowe)
+        {
+            var wynik = siec.PropagacjaWPrzod(wejscie);
+            Console.WriteLine($"Wejscie: [{wejscie[0]}, {wejscie[1]}] -> Wyjscie: {Math.Round(wynik[0], 2)}");
+        }
+    }
+}
